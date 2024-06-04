@@ -3,10 +3,9 @@ from typing import Optional, Tuple
 import numpy as np
 import pandas as pd
 import toml
-from scipy.stats import norm
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-#import src.compdata.comp_data as damo_data
+# import src.compdata.comp_data as damo_data
 
 
 class StockData(BaseModel):
@@ -80,7 +79,7 @@ class DCFAssumptions(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def check_all_same_types(self):
+    def check_all_same_types(self) -> "DCFAssumptions":
         arrays = self._get_all_arrays()
         if not all(isinstance(array, np.ndarray) for array in arrays) and not all(
             isinstance(array, float) for array in arrays
@@ -88,29 +87,6 @@ class DCFAssumptions(BaseModel):
             raise ValueError("All fields must be either a numpy array or float")
         return self
 
-
-class OptionValuation(BaseModel):
-    k : float # average strike price
-    t : float # average time to maturity in years
-
-    def compute_sigma(self, stock_name):
-        # Fetch historical price data for the stock to compute std dev
-        today = datetime.now()
-        one_year_ago = today - timedelta(days=365)
-        close = yf.download(stock_name, start=today.strftime("%Y-%m-%d"), end=one_year_ago.strftime("%Y-%m-%d"))['Adj Close']
-        std_dev = np.std(close)
-    
-    def black_scholes_call(self,
-                           stock_name:str, 
-                           s: float, # current stock price
-                           q:float,  # annualized dividend
-                           r:float):
-        sigma = self.compute_sigma(stock_name)
-        d1 = (np.log(s / self.k) + (r - q + 0.5 * sigma**2) * self.T) / (sigma * np.sqrt(self.T))
-        d2 = d1 - sigma * np.sqrt(self.T)
-
-        call_price = (s * np.exp(-q * self.t) * norm.cdf(d1)) - (self.k * np.exp(-r * self.t) * norm.cdf(d2))
-        return call_price
 
 class DCFCalculator(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
