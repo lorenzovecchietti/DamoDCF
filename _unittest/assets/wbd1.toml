@@ -1,0 +1,40 @@
+ticker_symbol = "WBD" 
+multiplier = 10E+10
+current_stock_price = 7.73
+
+[firm_data]
+revenue = 40.58
+operating_income = -3.49
+interest_expense = 2.17
+book_value_of_equity = 45.23
+book_value_of_debt = 52.70
+cash_and_marketable_securities = 2.98
+cross_holdings_and_other_non_operating_assets = 0
+minority_interests = 0
+number_of_shares_outstanding = 2.44
+carryforward_nol = 2.235
+effective_tax_rate = 0.19
+
+[future_assumptions]
+revenue_growth = [0.02,	0.05,	0.05,	0.05, 0.05,	0.0489, 0.0478,	0.0468, 0.0457, 0.0446]
+operating_margin = [-0.0260,-0.0008, 0.0118, 0.0244,	0.0370,	0.0496,	0.0622,	0.0748,	0.0874, 0.1]
+sales_to_capital_ratio = [2, 2, 3, 5, 10, 25, 50, 100, 100, 100] # inizialmente devono investire nella piattaforma max, ma lo sviluppo dei contenuti e' un costo fisso -> va messo all'interno del margin
+tax_rate = [0.2,0.2,0.2,0.20,0.2,0.21,0.22,0.23,0.24,0.25]
+cost_of_capital=[0.0824,0.0824,	0.0824,0.0824,0.0824,	0.0835,	0.0846,	0.0857,	0.0868,0.0879]
+
+[terminal_values]
+tax_rate = 0.25
+operating_margin = 0.1
+sales_to_capital_ratio = 100
+revenue_growth = 0.0446
+cost_of_capital = 0.0879
+return_on_capital = 0.0879
+
+[market_data]
+riskfree_rate = 0.0446
+marginal_tax_rate = 0.25
+
+[options_outstanding]
+number_of_options_outstanding = 4.10
+k = 8.67 # average strike price
+t = 2.50 # average time to maturity in years
