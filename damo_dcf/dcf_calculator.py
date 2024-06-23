@@ -96,6 +96,8 @@ class DCFCalculator(BaseModel):
     ticker_symbol: str
     multiplier: int
     stock_data: StockData
+    current_stock_price: float
+    annualized_dividend: float
     dcf_assumptions: DCFAssumptions
     dcf_terminal: DCFAssumptions
     market_data: MarketData
@@ -161,11 +163,11 @@ class DCFCalculator(BaseModel):
             + -self.stock_data.minority_interests
             + self.stock_data.cash_and_marketable_securities
             + self.stock_data.cross_holdings_and_other_non_operating_assets
-            - self.option_data.black_scholes_call(current_stock_price, annualized_dividend,  # annualized dividend
-        r: float,  # risk free rate
-        n_s: int,  # number of shares outstanding)
+            - self.option_data.black_scholes_call(self.current_stock_price,
+                                                  self.stock_data.annualized_dividend,
+                                                  self.market_data.riskfree_rate,
+                                                  self.stock_data.number_of_shares_outstanding)
         )  # TODO: add failure
-        # TODO: add options
 
         self._equity_value=equity_value
 
