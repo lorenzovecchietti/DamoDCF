@@ -20,7 +20,7 @@ def compute_stock_sigma(stock_name: str) -> float:
     return std_dev
 
 
-class OptionValuation(BaseModel):
+class OptionData(BaseModel):
     k: float  # average strike price
     t: float  # average time to maturity in years
     sigma: Optional[float]
