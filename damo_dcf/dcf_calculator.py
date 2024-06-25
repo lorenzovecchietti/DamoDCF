@@ -21,8 +21,7 @@ class StockData(BaseModel):
     number_of_shares_outstanding: int
     carryforward_nol: float = 0.0
     effective_tax_rate: float
-    current_stock_price: float
-    annualized_dividend : float
+    annualized_dividend: float
 
 
 class MarketData(BaseModel):
@@ -96,19 +95,20 @@ class DCFCalculator(BaseModel):
     multiplier: int
     stock_data: StockData
     current_stock_price: float
-    annualized_dividend: float
     dcf_assumptions: DCFAssumptions
     dcf_terminal: DCFAssumptions
     market_data: MarketData
-    option_data: OptionData
-    _future_financials : Optional[pd.DataFrame]
-    _equity_value : Optional[float]
+    option_data: Optional[OptionData] = None
+    _future_financials : Optional[pd.DataFrame] = None
+    _equity_value : Optional[float] = None
 
     def __init__(self, input_toml: str):
         with open(input_toml, "r") as file:
             data = toml.load(file)
         financials = {k: v * data["multiplier"] for k, v in data["firm_data"].items()}
         if data.get("options", False):
+            data["options"]['ticker_symbol']=data["ticker_symbol"]
+            data["options"]["n_o"]=int(data["multiplier"]*data["options"]["n_o"])
             option_data = OptionData(**data["options"])
         else:
             
@@ -126,9 +126,9 @@ class DCFCalculator(BaseModel):
 
     @property
     def future_financials(self):
-        if self._future_finantials is None:
+        if self._future_financials is None:
             self._compute_future_financials()
-        return self._future_finantials
+        return self._future_financials
 
     @property
     def _years_to_predict(self) -> int:
@@ -152,7 +152,7 @@ class DCFCalculator(BaseModel):
         self.run_dcf()
 
     def run_dcf(self):
-        cum_disc_factor, pv = self.discount_cash_flows(
+        cum_disc_factor, pv = self._discount_cash_flows(
             self.future_financials["FCFF"].values[1:-1]
         )
         terminal_cash_flow = (
@@ -167,11 +167,9 @@ class DCFCalculator(BaseModel):
             + -self.stock_data.minority_interests
             + self.stock_data.cash_and_marketable_securities
             + self.stock_data.cross_holdings_and_other_non_operating_assets
-            - self.option_data.black_scholes_call(self.current_stock_price,
-                                                  self.stock_data.annualized_dividend,
-                                                  self.market_data.riskfree_rate,
-                                                  self.stock_data.number_of_shares_outstanding)
         )  # TODO: add failure
+        if self.option_data is not None:
+            equity_value-= self.option_data.black_scholes_call(self.current_stock_price, self.stock_data.annualized_dividend, self.market_data.riskfree_rate, self.stock_data.number_of_shares_outstanding)
 
         self._equity_value=equity_value
 
