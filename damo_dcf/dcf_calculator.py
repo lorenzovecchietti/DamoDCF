@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 # import src.compdata.comp_data as damo_data
 
-
 class StockData(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     revenue: int
@@ -101,6 +100,7 @@ class DCFCalculator(BaseModel):
     dcf_assumptions: DCFAssumptions
     dcf_terminal: DCFAssumptions
     market_data: MarketData
+    option_data: OptionData
     _future_financials : Optional[pd.DataFrame]
     _equity_value : Optional[float]
 
@@ -109,8 +109,9 @@ class DCFCalculator(BaseModel):
             data = toml.load(file)
         financials = {k: v * data["multiplier"] for k, v in data["firm_data"].items()}
         if data.get("options", False):
-            option_data = OptionData()
+            option_data = OptionData(**data["options"])
         else:
+            
             option_data = None
         super().__init__(
             ticker_symbol=data["ticker_symbol"],
@@ -120,10 +121,11 @@ class DCFCalculator(BaseModel):
             dcf_assumptions=DCFAssumptions(**data["future_assumptions"]),
             dcf_terminal=DCFAssumptions(**data["terminal_values"]),
             market_data=MarketData(**data["market_data"]),
-        )
+            option_data=option_data
+        ) 
 
     @property
-    def future_finantials(self):
+    def future_financials(self):
         if self._future_finantials is None:
             self._compute_future_financials()
         return self._future_finantials
@@ -133,14 +135,16 @@ class DCFCalculator(BaseModel):
         return self.dcf_assumptions.revenue_growth.size+2
     
     @property
-    def stock_value():
+    def stock_value(self) -> float:
         return self.equity_value / self.stock_data.number_of_shares_outstanding
     
     @property
-    def equity_value():
+    def equity_value(self) -> float:
         if self._equity_value is None:
-            self._run_dcf()
-        return self._equity_value 
+            equity_value=self._run_dcf()
+        else:
+            equity_value=self._equity_value
+        return equity_value 
 
     def update(self):
         self._future_finantials=None
@@ -149,10 +153,10 @@ class DCFCalculator(BaseModel):
 
     def run_dcf(self):
         cum_disc_factor, pv = self.discount_cash_flows(
-            self._future_financials["FCFF"].values[1:-1]
+            self.future_financials["FCFF"].values[1:-1]
         )
         terminal_cash_flow = (
-            self._future_financials["FCFF"].values[-1]
+            self.future_financials["FCFF"].values[-1]
             / (self.dcf_terminal.cost_of_capital - self.dcf_terminal.revenue_growth)
             * cum_disc_factor
         )
@@ -229,6 +233,7 @@ class DCFCalculator(BaseModel):
             )
             fcff[i] = net_income[i] - reinvestment[i]
 
+        i=years-2
         # terminal year reinvestment
         reinvestment[i + 1] = max(
             0,
@@ -249,5 +254,3 @@ class DCFCalculator(BaseModel):
 
         self._future_financials=pd.DataFrame(data)
 
-
-#      damo_data
