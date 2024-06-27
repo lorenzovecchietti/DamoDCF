@@ -16,11 +16,11 @@ def compute_stock_sigma(stock_name: str) -> float:
         end=today.strftime("%Y-%m-%d"),
         start=one_year_ago.strftime("%Y-%m-%d"),
     )["Adj Close"]
-    std_dev = np.std(close)
+    std_dev = float(np.std(close))
     return std_dev
 
 
-class OptionValuation(BaseModel):
+class OptionData(BaseModel):
     k: float  # average strike price
     t: float  # average time to maturity in years
     sigma: Optional[float]

@@ -14,6 +14,7 @@ minority_interests = 0
 number_of_shares_outstanding = 2.44
 carryforward_nol = 2.235
 effective_tax_rate = 0.19
+annualized_dividend = 0
 
 [future_assumptions]
 revenue_growth = [0.02,	0.05,	0.05,	0.05, 0.05,	0.0489, 0.0478,	0.0468, 0.0457, 0.0446]
@@ -34,7 +35,8 @@ return_on_capital = 0.0879
 riskfree_rate = 0.0446
 marginal_tax_rate = 0.25
 
-[options_outstanding]
-number_of_options_outstanding = 4.10
-k = 8.67 # average strike price
-t = 2.50 # average time to maturity in years
+# Options disabled
+# [options]
+# n_o = 4.10 # number of options outstanding
+# k = 8.67 # average strike price
+# t = 2.50 # average time to maturity in years
