@@ -11,7 +11,7 @@ class DamoDCFTests(unittest.TestCase):
         # Test DCF from TOML. No options outstanding, no R&D capitalization.
         wbd = dcf_calculator.DCFCalculator("_unittest/assets/wbd1.toml")
         assert wbd is not None
-        wbd.run_dcf()        
+        wbd.run_dcf()
         assert wbd.future_financials is not None
         assert abs(wbd.equity_value + 1758307933610.157) < 0.001
         assert abs(wbd.stock_value + 7.206) < 0.001
