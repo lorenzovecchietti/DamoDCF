@@ -3,10 +3,12 @@ from typing import Optional, Tuple
 import numpy as np
 import pandas as pd
 import toml
-from damo_dcf.option_calculator import OptionData
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from damo_dcf.option_calculator import OptionData
+
 # import src.compdata.comp_data as damo_data
+
 
 class StockData(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -99,19 +101,19 @@ class DCFCalculator(BaseModel):
     dcf_terminal: DCFAssumptions
     market_data: MarketData
     option_data: Optional[OptionData] = None
-    _future_financials : Optional[pd.DataFrame] = None
-    _equity_value : Optional[float] = None
+    _future_financials: Optional[pd.DataFrame] = None
+    _equity_value: Optional[float] = None
 
     def __init__(self, input_toml: str):
         with open(input_toml, "r") as file:
             data = toml.load(file)
         financials = {k: v * data["multiplier"] for k, v in data["firm_data"].items()}
         if data.get("options", False):
-            data["options"]['ticker_symbol']=data["ticker_symbol"]
-            data["options"]["n_o"]=int(data["multiplier"]*data["options"]["n_o"])
+            data["options"]["ticker_symbol"] = data["ticker_symbol"]
+            data["options"]["n_o"] = int(data["multiplier"] * data["options"]["n_o"])
             option_data = OptionData(**data["options"])
         else:
-            
+
             option_data = None
         super().__init__(
             ticker_symbol=data["ticker_symbol"],
@@ -121,8 +123,8 @@ class DCFCalculator(BaseModel):
             dcf_assumptions=DCFAssumptions(**data["future_assumptions"]),
             dcf_terminal=DCFAssumptions(**data["terminal_values"]),
             market_data=MarketData(**data["market_data"]),
-            option_data=option_data
-        ) 
+            option_data=option_data,
+        )
 
     @property
     def future_financials(self):
@@ -132,23 +134,23 @@ class DCFCalculator(BaseModel):
 
     @property
     def _years_to_predict(self) -> int:
-        return self.dcf_assumptions.revenue_growth.size+2
-    
+        return self.dcf_assumptions.revenue_growth.size + 2
+
     @property
     def stock_value(self) -> float:
         return self.equity_value / self.stock_data.number_of_shares_outstanding
-    
+
     @property
     def equity_value(self) -> float:
         if self._equity_value is None:
-            equity_value=self._run_dcf()
+            equity_value = self._run_dcf()
         else:
-            equity_value=self._equity_value
-        return equity_value 
+            equity_value = self._equity_value
+        return equity_value
 
     def update(self):
-        self._future_finantials=None
-        self._equity_value=None
+        self._future_finantials = None
+        self._equity_value = None
         self.run_dcf()
 
     def run_dcf(self):
@@ -169,9 +171,14 @@ class DCFCalculator(BaseModel):
             + self.stock_data.cross_holdings_and_other_non_operating_assets
         )  # TODO: add failure
         if self.option_data is not None:
-            equity_value-= self.option_data.black_scholes_call(self.current_stock_price, self.stock_data.annualized_dividend, self.market_data.riskfree_rate, self.stock_data.number_of_shares_outstanding)
+            equity_value -= self.option_data.black_scholes_call(
+                self.current_stock_price,
+                self.stock_data.annualized_dividend,
+                self.market_data.riskfree_rate,
+                self.stock_data.number_of_shares_outstanding,
+            )
 
-        self._equity_value=equity_value
+        self._equity_value = equity_value
 
     def _discount_cash_flows(self, cash_flows: np.ndarray) -> Tuple[float, float]:
         discounted_factor = 1 / (1 + self.dcf_assumptions.cost_of_capital)
@@ -231,7 +238,7 @@ class DCFCalculator(BaseModel):
             )
             fcff[i] = net_income[i] - reinvestment[i]
 
-        i=years-2
+        i = years - 2
         # terminal year reinvestment
         reinvestment[i + 1] = max(
             0,
@@ -250,5 +257,4 @@ class DCFCalculator(BaseModel):
             "NOL": nol,
         }
 
-        self._future_financials=pd.DataFrame(data)
-
+        self._future_financials = pd.DataFrame(data)
