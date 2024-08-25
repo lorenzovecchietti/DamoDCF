@@ -35,3 +35,8 @@ return_on_capital = 0.0879
 riskfree_rate = 0.0446
 marginal_tax_rate = 0.25
 
+[options]
+n_o = 4.10 # number of options outstanding
+k = 8.67 # average strike price
+t = 2.50 # average time to maturity in years
+sigma=0.1
