@@ -7,7 +7,31 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from damo_dcf.option_calculator import OptionData
 
-# import src.compdata.comp_data as damo_data
+def run_dcf_from_toml(input_toml: str):
+    dcf=initialize_dcf_from_toml(input_toml)
+    dcf.run()
+
+def initialize_dcf_from_toml(input_toml: str) -> DCFCalculator:
+    with open(input_toml, "r") as file:
+        data = toml.load(file)
+    financials = {k: v * data["multiplier"] for k, v in data["firm_data"].items()}
+    if data.get("options", False):
+        data["options"]["ticker_symbol"] = data["ticker_symbol"]
+        data["options"]["n_o"] = int(data["multiplier"] * data["options"]["n_o"])
+        option_data = OptionData(**data["options"])
+    else:
+
+        option_data = None
+    return DCFCalculator(
+        ticker_symbol=data["ticker_symbol"],
+        multiplier=data["multiplier"],
+        current_stock_price=data["current_stock_price"],
+        stock_data=StockData(**financials),
+        dcf_assumptions=DCFAssumptions(**data["future_assumptions"]),
+        dcf_terminal=DCFAssumptions(**data["terminal_values"]),
+        market_data=MarketData(**data["market_data"]),
+        option_data=option_data,
+        )
 
 
 class StockData(BaseModel):
@@ -101,44 +125,17 @@ class DCFCalculator(BaseModel):
     dcf_terminal: DCFAssumptions
     market_data: MarketData
     option_data: Optional[OptionData] = None
-    _future_financials: Optional[pd.DataFrame] = None
-    _equity_value: Optional[float] = None
-
-    def __init__(self, input_toml: str):
-        with open(input_toml, "r") as file:
-            data = toml.load(file)
-        financials = {k: v * data["multiplier"] for k, v in data["firm_data"].items()}
-        if data.get("options", False):
-            data["options"]["ticker_symbol"] = data["ticker_symbol"]
-            data["options"]["n_o"] = int(data["multiplier"] * data["options"]["n_o"])
-            option_data = OptionData(**data["options"])
-        else:
-
-            option_data = None
-        super().__init__(
-            ticker_symbol=data["ticker_symbol"],
-            multiplier=data["multiplier"],
-            current_stock_price=data["current_stock_price"],
-            stock_data=StockData(**financials),
-            dcf_assumptions=DCFAssumptions(**data["future_assumptions"]),
-            dcf_terminal=DCFAssumptions(**data["terminal_values"]),
-            market_data=MarketData(**data["market_data"]),
-            option_data=option_data,
-        )
-
-    @property
-    def future_financials(self):
-        if self._future_financials is None:
-            self._compute_future_financials()
-        return self._future_financials
 
     @property
     def _years_to_predict(self) -> int:
         return self.dcf_assumptions.revenue_growth.size + 2
-
-    @property
-    def stock_value(self) -> float:
-        return self.equity_value / self.stock_data.number_of_shares_outstanding
+    
+    def _discount_cash_flows(self, cash_flows: np.ndarray) -> Tuple[float, float]:
+        discounted_factor = 1 / (1 + self.dcf_assumptions.cost_of_capital)
+        cumulative_discounted_factor = np.cumprod(discounted_factor)
+        return cumulative_discounted_factor[-1], np.sum(
+            cumulative_discounted_factor * cash_flows
+        )
 
     @property
     def equity_value(self) -> float:
@@ -148,17 +145,13 @@ class DCFCalculator(BaseModel):
             equity_value = self._equity_value
         return equity_value
 
-    def update(self):
-        self._future_finantials = None
-        self._equity_value = None
-        self.run_dcf()
-
-    def run_dcf(self):
+    def run(self) -> float:
+        future_financials=self.compute_future_financials()
         cum_disc_factor, pv = self._discount_cash_flows(
-            self.future_financials["FCFF"].values[1:-1]
+            future_financials["FCFF"].values[1:-1]
         )
         terminal_cash_flow = (
-            self.future_financials["FCFF"].values[-1]
+            future_financials["FCFF"].values[-1]
             / (self.dcf_terminal.cost_of_capital - self.dcf_terminal.revenue_growth)
             * cum_disc_factor
         )
@@ -177,17 +170,9 @@ class DCFCalculator(BaseModel):
                 self.market_data.riskfree_rate,
                 self.stock_data.number_of_shares_outstanding,
             )
+        return equity_value
 
-        self._equity_value = equity_value
-
-    def _discount_cash_flows(self, cash_flows: np.ndarray) -> Tuple[float, float]:
-        discounted_factor = 1 / (1 + self.dcf_assumptions.cost_of_capital)
-        cumulative_discounted_factor = np.cumprod(discounted_factor)
-        return cumulative_discounted_factor[-1], np.sum(
-            cumulative_discounted_factor * cash_flows
-        )
-
-    def _compute_future_financials(self):
+    def compute_future_financials(self) -> pd.DataFrame:
         years = self._years_to_predict
         # Creazione array per gli anni
         revenues = np.zeros(years)
@@ -257,4 +242,4 @@ class DCFCalculator(BaseModel):
             "NOL": nol,
         }
 
-        self._future_financials = pd.DataFrame(data)
+        return pd.DataFrame(data)
