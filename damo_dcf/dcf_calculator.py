@@ -7,8 +7,6 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from damo_dcf.option_calculator import OptionData
 
-# import src.compdata.comp_data as damo_data
-
 
 class StockData(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -31,26 +29,22 @@ class MarketData(BaseModel):
     marginal_tax_rate: float
 
 
+class DCFTerminalAssumptions(BaseModel):
+    revenue_growth: float
+    operating_margin: float
+    sales_to_capital_ratio: float
+    tax_rate: float
+    cost_of_capital: float
+    return_on_capital: float
+
+
 class DCFAssumptions(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    revenue_growth: np.ndarray | float
-    operating_margin: np.ndarray | float
-    sales_to_capital_ratio: np.ndarray | float
-    tax_rate: np.ndarray | float
-    cost_of_capital: np.ndarray | float
-    return_on_capital: Optional[float] = None
-
-    def _get_all_arrays(self):
-        return [
-            self.__getattribute__(field)
-            for field in [
-                "revenue_growth",
-                "operating_margin",
-                "sales_to_capital_ratio",
-                "tax_rate",
-                "cost_of_capital",
-            ]
-        ]
+    revenue_growth: np.ndarray
+    operating_margin: np.ndarray
+    sales_to_capital_ratio: np.ndarray
+    tax_rate: np.ndarray
+    cost_of_capital: np.ndarray
 
     @field_validator(
         "revenue_growth",
@@ -61,33 +55,22 @@ class DCFAssumptions(BaseModel):
         mode="before",
     )
     def make_ndarray(cls, v):
-        if isinstance(v, list):
-            v = np.asarray(v)
-        return v
+        return np.asarray(v)
 
     @model_validator(mode="after")
     def check_equal_length(self) -> "DCFAssumptions":
-        arrays = self._get_all_arrays()
-        if (
-            len(
-                {
-                    len(array)
-                    for array in arrays
-                    if array is not None and isinstance(array, np.ndarray)
-                }
-            )
-            > 1
-        ):
+        arrays = [
+            self.__getattribute__(field)
+            for field in [
+                "revenue_growth",
+                "operating_margin",
+                "sales_to_capital_ratio",
+                "tax_rate",
+                "cost_of_capital",
+            ]
+        ]
+        if len({len(array) for array in arrays}) > 1:
             raise ValueError("All arrays must have the same length.")
-        return self
-
-    @model_validator(mode="after")
-    def check_all_same_types(self) -> "DCFAssumptions":
-        arrays = self._get_all_arrays()
-        if not all(isinstance(array, np.ndarray) for array in arrays) and not all(
-            isinstance(array, float) for array in arrays
-        ):
-            raise ValueError("All fields must be either a numpy array or float")
         return self
 
 
@@ -98,67 +81,28 @@ class DCFCalculator(BaseModel):
     stock_data: StockData
     current_stock_price: float
     dcf_assumptions: DCFAssumptions
-    dcf_terminal: DCFAssumptions
+    dcf_terminal: DCFTerminalAssumptions
     market_data: MarketData
     option_data: Optional[OptionData] = None
-    _future_financials: Optional[pd.DataFrame] = None
-    _equity_value: Optional[float] = None
-
-    def __init__(self, input_toml: str):
-        with open(input_toml, "r") as file:
-            data = toml.load(file)
-        financials = {k: v * data["multiplier"] for k, v in data["firm_data"].items()}
-        if data.get("options", False):
-            data["options"]["ticker_symbol"] = data["ticker_symbol"]
-            data["options"]["n_o"] = int(data["multiplier"] * data["options"]["n_o"])
-            option_data = OptionData(**data["options"])
-        else:
-
-            option_data = None
-        super().__init__(
-            ticker_symbol=data["ticker_symbol"],
-            multiplier=data["multiplier"],
-            current_stock_price=data["current_stock_price"],
-            stock_data=StockData(**financials),
-            dcf_assumptions=DCFAssumptions(**data["future_assumptions"]),
-            dcf_terminal=DCFAssumptions(**data["terminal_values"]),
-            market_data=MarketData(**data["market_data"]),
-            option_data=option_data,
-        )
-
-    @property
-    def future_financials(self):
-        if self._future_financials is None:
-            self._compute_future_financials()
-        return self._future_financials
 
     @property
     def _years_to_predict(self) -> int:
         return self.dcf_assumptions.revenue_growth.size + 2
 
-    @property
-    def stock_value(self) -> float:
-        return self.equity_value / self.stock_data.number_of_shares_outstanding
+    def _discount_cash_flows(self, cash_flows: np.ndarray) -> Tuple[float, float]:
+        discounted_factor = 1 / (1 + self.dcf_assumptions.cost_of_capital)
+        cumulative_discounted_factor = np.cumprod(discounted_factor)
+        return cumulative_discounted_factor[-1], np.sum(
+            cumulative_discounted_factor * cash_flows
+        )
 
-    @property
-    def equity_value(self) -> float:
-        if self._equity_value is None:
-            equity_value = self._run_dcf()
-        else:
-            equity_value = self._equity_value
-        return equity_value
-
-    def update(self):
-        self._future_finantials = None
-        self._equity_value = None
-        self.run_dcf()
-
-    def run_dcf(self):
+    def run(self) -> float:
+        future_financials = self.compute_future_financials()
         cum_disc_factor, pv = self._discount_cash_flows(
-            self.future_financials["FCFF"].values[1:-1]
+            future_financials["FCFF"].values[1:-1]
         )
         terminal_cash_flow = (
-            self.future_financials["FCFF"].values[-1]
+            future_financials["FCFF"].values[-1]
             / (self.dcf_terminal.cost_of_capital - self.dcf_terminal.revenue_growth)
             * cum_disc_factor
         )
@@ -177,17 +121,9 @@ class DCFCalculator(BaseModel):
                 self.market_data.riskfree_rate,
                 self.stock_data.number_of_shares_outstanding,
             )
+        return equity_value
 
-        self._equity_value = equity_value
-
-    def _discount_cash_flows(self, cash_flows: np.ndarray) -> Tuple[float, float]:
-        discounted_factor = 1 / (1 + self.dcf_assumptions.cost_of_capital)
-        cumulative_discounted_factor = np.cumprod(discounted_factor)
-        return cumulative_discounted_factor[-1], np.sum(
-            cumulative_discounted_factor * cash_flows
-        )
-
-    def _compute_future_financials(self):
+    def compute_future_financials(self) -> pd.DataFrame:
         years = self._years_to_predict
         # Creazione array per gli anni
         revenues = np.zeros(years)
@@ -242,7 +178,8 @@ class DCFCalculator(BaseModel):
         # terminal year reinvestment
         reinvestment[i + 1] = max(
             0,
-            (self.dcf_terminal.revenue_growth / self.dcf_terminal.return_on_capital)
+            self.dcf_terminal.revenue_growth
+            / self.dcf_terminal.return_on_capital
             * net_income[i + 1],
         )
         fcff[i + 1] = net_income[i + 1] - reinvestment[i + 1]
@@ -257,4 +194,31 @@ class DCFCalculator(BaseModel):
             "NOL": nol,
         }
 
-        self._future_financials = pd.DataFrame(data)
+        return pd.DataFrame(data)
+
+
+def initialize_dcf_from_toml(input_toml: str) -> DCFCalculator:
+    with open(input_toml, "r") as file:
+        data = toml.load(file)
+    financials = {k: v * data["multiplier"] for k, v in data["firm_data"].items()}
+    if data.get("options", False):
+        data["options"]["n_o"] = int(data["multiplier"] * data["options"]["n_o"])
+        option_data = OptionData(**data["options"])
+    else:
+
+        option_data = None
+    return DCFCalculator(
+        ticker_symbol=data["ticker_symbol"],
+        multiplier=data["multiplier"],
+        current_stock_price=data["current_stock_price"],
+        stock_data=StockData(**financials),
+        dcf_assumptions=DCFAssumptions(**data["future_assumptions"]),
+        dcf_terminal=DCFTerminalAssumptions(**data["terminal_values"]),
+        market_data=MarketData(**data["market_data"]),
+        option_data=option_data,
+    )
+
+
+def run_dcf_from_toml(input_toml: str):
+    dcf = initialize_dcf_from_toml(input_toml)
+    return dcf.run()

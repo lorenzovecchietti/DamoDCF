@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from typing import Optional
 
 import numpy as np
 import yfinance as yf
@@ -23,15 +22,10 @@ def compute_stock_sigma(stock_name: str) -> float:
 class OptionData(BaseModel):
     k: float  # average strike price
     t: float  # average time to maturity in years
-    sigma: Optional[float]
+    sigma: float
     n_o: int  # number of warrants outstanding
 
-    def __init__(self, k: float, t: float, ticker_symbol: str, n_o: int):
-        try:
-            sigma = compute_stock_sigma(ticker_symbol)
-        except Exception:
-            print("No std deviation computed. Set it manually.")
-            sigma = None
+    def __init__(self, k: float, t: float, sigma: float, n_o: int):
         super().__init__(k=k, t=t, sigma=sigma, n_o=n_o)
 
     def black_scholes_call(
@@ -41,8 +35,6 @@ class OptionData(BaseModel):
         r: float,  # risk free rate
         n_s: int,  # number of shares outstanding
     ) -> float:
-        if self.sigma is None:
-            raise AttributeError("Assign a value to the sigma field.")
         s = (s * n_s + self.k * self.n_o) / (n_s + self.n_o)
         d1 = (np.log(s / self.k) + (r - q + 0.5 * self.sigma**2) * self.t) / (
             self.sigma * np.sqrt(self.t)
