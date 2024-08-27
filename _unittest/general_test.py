@@ -7,15 +7,14 @@ from damo_dcf.option_calculator import OptionData
 
 def test_01():
     # Test DCF from TOML. No options outstanding, no R&D capitalization.
-    wbd_file = "_unittest/assets/wbd1.toml"
-    wbd = dcf_calculator.initialize_dcf_from_toml(wbd_file)
-    assert wbd is not None
-    ev = wbd.run()
-    ff = wbd.compute_future_financials()
+    amzn_file = "_unittest/assets/amzn.toml"
+    amzn = dcf_calculator.initialize_dcf_from_toml(amzn_file)
+    assert amzn is not None
+    ev = amzn.run()
+    ff = amzn.compute_future_financials()
     assert ff is not None
-    assert abs(ev + 1758307933610.157) < 0.001
-    assert abs(ev / wbd.stock_data.number_of_shares_outstanding + 7.206) < 0.001
-    assert (dcf_calculator.run_dcf_from_toml(wbd_file) - ev) < 0.001
+    assert abs(ev - 979883353664.1257) < 0.001
+    assert (dcf_calculator.run_dcf_from_toml(amzn_file) - ev) < 0.001
 
 
 def test_02_options_class():
@@ -45,3 +44,11 @@ def test_04_failed_initialization():
             tax_rate=[1, 2],
             cost_of_capital=[1, 2],
         )
+
+
+def test_05_failure_calculation():
+    wbd = dcf_calculator.initialize_dcf_from_toml("_unittest/assets/wbd3.toml")
+    assert wbd.failure_data is not None
+    assert (wbd.failure_data.compute_failure(100000, 50000, 50000) - 80000.0) < 0.001
+    wbd.failure_data.proceeds_value = "fair"
+    assert (wbd.failure_data.compute_failure(1000000, 50000, 50000) - 800000.0) < 0.001

@@ -17,19 +17,13 @@ effective_tax_rate = 0.19
 annualized_dividend = 0
 
 [future_assumptions]
-revenue_growth = [0.02,	0.05, 0.05,	0.05, 0.05,	0.0489, 0.0478,	0.0468, 0.0457, 0.0446]
-operating_margin = [-0.0260,-0.0008, 0.0118, 0.0244,	0.0370,	0.0496,	0.0622,	0.0748,	0.0874, 0.1]
-sales_to_capital_ratio = [2, 2, 3, 5, 10, 25, 50, 100, 100, 100] # inizialmente devono investire nella piattaforma max, ma lo sviluppo dei contenuti e' un costo fisso -> va messo all'interno del margin
-tax_rate = [0.2,0.2,0.2,0.20,0.2,0.21,0.22,0.23,0.24,0.25]
-cost_of_capital=[0.0824,0.0824,	0.0824,0.0824,0.0824,	0.0835,	0.0846,	0.0857,	0.0868,0.0879]
+revenue_growth = [0.02,	0.05, 0.05,	0.05, 0.05,	0.0489, 0.0478,	0.0468, 0.0457, 0.0446, 0.0446]
+operating_margin = [-0.0260,-0.0008, 0.0118, 0.0244,	0.0370,	0.0496,	0.0622,	0.0748,	0.0874, 0.1, 0.1]
+sales_to_capital_ratio = [2, 2, 3, 5, 10, 25, 50, 100, 100, 100, 100]
+tax_rate = [0.2,0.2,0.2,0.20,0.2,0.21,0.22,0.23,0.24,0.25, 0.25]
+cost_of_capital=[0.0824,0.0824,	0.0824,0.0824,0.0824,	0.0835,	0.0846,	0.0857,	0.0868,0.0879,0.0879]
+terminal_return_on_capital = 0.0879
 
-[terminal_values]
-tax_rate = 0.25
-operating_margin = 0.1
-sales_to_capital_ratio = 100
-revenue_growth = 0.0446
-cost_of_capital = 0.0879
-return_on_capital = 0.0879
 
 [market_data]
 riskfree_rate = 0.0446
