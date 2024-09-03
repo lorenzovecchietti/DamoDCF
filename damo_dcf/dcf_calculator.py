@@ -1,7 +1,6 @@
 from typing import Optional
 
 import numpy as np
-import pandas as pd
 import toml
 from pydantic import BaseModel, ConfigDict
 
@@ -23,11 +22,11 @@ class DCFCalculator(BaseModel):
 
     @property
     def _years_to_predict(self) -> int:
-        return self.dcf_assumptions.revenue_growth.size
+        return self.dcf_assumptions.revenue_growth.shape[-1]
 
     def run(self) -> float:
         future_financials = self.compute_future_financials()
-        pv_sum = sum(future_financials["PV FCFF"].values)
+        pv_sum = np.sum(future_financials["PV FCFF"], axis=1)
         failure_probability = (
             self.failure_data.failure_probability
             if self.failure_data is not None
@@ -59,7 +58,7 @@ class DCFCalculator(BaseModel):
             )
         return equity_value
 
-    def compute_future_financials(self) -> pd.DataFrame:
+    def compute_future_financials(self) -> dict:
         years = self._years_to_predict
 
         # Pointers
@@ -68,40 +67,43 @@ class DCFCalculator(BaseModel):
         operating_margin = self.dcf_assumptions.operating_margin
         revenue_growth = self.dcf_assumptions.revenue_growth
 
-        # Initialize
-        reinvestment = np.zeros(years)
-        pv_fcf = np.zeros(years)
-
-        revenues = self.stock_data.revenue * np.cumprod(1 + revenue_growth, axis=0)
+        revenues = self.stock_data.revenue * np.cumprod(1 + revenue_growth, axis=1)
         ebit_income = revenues * operating_margin
-        nol = np.maximum(0, self.stock_data.carryforward_nol - np.cumsum(ebit_income))
+        nol = np.maximum(
+            0, self.stock_data.carryforward_nol - np.cumsum(ebit_income, axis=1)
+        )
         net_income = np.minimum(
             ebit_income,
             ebit_income - (ebit_income - nol) * tax_rate,
         )
 
-        reinvestment[:-1] = np.ediff1d(revenues) / sales_to_capital_ratio
-        reinvestment[-1] = (
-            self.dcf_assumptions.revenue_growth[-1]
-            / self.dcf_assumptions.cost_of_capital[-1]
-            * net_income[-1]
+        # Initialize
+        reinvestment = np.zeros((sales_to_capital_ratio.shape[0], years))
+
+        reinvestment[:, :-1] = (
+            np.asarray([np.ediff1d(r) for r in revenues]) / sales_to_capital_ratio
+        )
+        reinvestment[:, -1] = (
+            self.dcf_assumptions.revenue_growth[:, -1]
+            / self.dcf_assumptions.cost_of_capital[:, -1]
+            * net_income[:, -1]
         )
         reinvestment = np.maximum(0, reinvestment)
 
         fcff = net_income - reinvestment
         cum_disc_factor = np.cumprod(
-            1 / (1 + self.dcf_assumptions.cost_of_capital[:-1])
+            1 / (1 + self.dcf_assumptions.cost_of_capital[:, :-1]), axis=1
         )
-        pv_fcf[:-1] = fcff[:-1] * cum_disc_factor
-        pv_fcf[-1] = (
-            fcff[-1]
+        pv_fcf = np.zeros((max(fcff.shape[0], cum_disc_factor.shape[0]), years))
+        pv_fcf[:, :-1] = fcff[:, :-1] * cum_disc_factor
+        pv_fcf[:, -1] = (
+            fcff[:, -1]
             / (
-                self.dcf_assumptions.cost_of_capital[-1]
-                - self.dcf_assumptions.revenue_growth[-1]
+                self.dcf_assumptions.cost_of_capital[:, -1]
+                - self.dcf_assumptions.revenue_growth[:, -1]
             )
-            * cum_disc_factor[-1]
+            * cum_disc_factor[:, -1]
         )
-
         # Creare il DataFrame
         data = {
             "Revenues": revenues,
@@ -112,8 +114,7 @@ class DCFCalculator(BaseModel):
             "NOL": nol,
             "PV FCFF": pv_fcf,
         }
-
-        return pd.DataFrame(data)
+        return data
 
 
 def initialize_dcf_from_toml(input_toml: str) -> DCFCalculator:

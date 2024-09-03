@@ -40,7 +40,10 @@ class DCFAssumptions(BaseModel):
         mode="before",
     )
     def make_ndarray(cls, v):
-        return np.asarray(v)
+        v = np.asarray(v)
+        if len(v.shape) == 1:
+            v = v.reshape(1, v.shape[0])
+        return v
 
     @model_validator(mode="after")
     def check_equal_length(self) -> "DCFAssumptions":
@@ -55,18 +58,18 @@ class DCFAssumptions(BaseModel):
             ]
         ]
         if (
-            len({arr_len := len(array) for array in arrays[:-1]}) > 1
-            or len(arrays[-1]) > arr_len
-            or len(arrays[-1]) < arr_len - 1
+            len({arr_len := array.shape[-1] for array in arrays[:-1]}) > 1
+            or arrays[-1].shape[-1] > arr_len
+            or arrays[-1].shape[-1] < arr_len - 1
         ):
             raise ValueError(
                 "All arrays must have the same length except for "
                 "sales_to_capital_ratio for which terminal year value is not needed."
             )
-        elif arr_len == len(arrays[-1]):
+        elif arr_len == arrays[-1].shape[-1]:
             print(
                 "Terminal year value for sales_to_capital_ratio is not needed "
                 "and will be ignored"
             )
-            self.sales_to_capital_ratio = self.sales_to_capital_ratio[:-1]
+            self.sales_to_capital_ratio = self.sales_to_capital_ratio[:, :-1]
         return self
