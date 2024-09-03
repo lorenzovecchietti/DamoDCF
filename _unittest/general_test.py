@@ -1,8 +1,18 @@
+import tempfile
+
+import matplotlib
+import numpy as np
 import pytest
 
 from damo_dcf import dcf_calculator, option_calculator
 from damo_dcf.dcf_calculator import DCFAssumptions
 from damo_dcf.option_calculator import OptionData
+from damo_dcf.plotting import plot_financials_from_assumptions
+
+
+@pytest.fixture(autouse=True)
+def set_mpl_backend():
+    matplotlib.use("Agg")
 
 
 def test_01():
@@ -52,3 +62,37 @@ def test_05_failure_calculation():
     assert (wbd.failure_data.compute_failure(100000, 50000, 50000) - 80000.0) < 0.001
     wbd.failure_data.proceeds_value = "fair"
     assert (wbd.failure_data.compute_failure(1000000, 50000, 50000) - 800000.0) < 0.001
+
+
+def test_06_montecarlo_dcf():
+    montecarlo_size = 100
+    amzn_file = "_unittest/assets/amzn.toml"
+    amzn = dcf_calculator.initialize_dcf_from_toml(amzn_file)
+    # add uncertanties
+    amzn.dcf_assumptions.revenue_growth = (
+        amzn.dcf_assumptions.revenue_growth
+        * np.random.normal(1.0, 0.2, (montecarlo_size, 1))
+    )
+    amzn.dcf_assumptions.operating_margin = (
+        amzn.dcf_assumptions.operating_margin
+        * np.random.uniform(0.75, 1.25, (montecarlo_size, 1))
+    )
+    amzn.dcf_assumptions.sales_to_capital_ratio = (
+        amzn.dcf_assumptions.sales_to_capital_ratio
+        * np.random.uniform(0.75, 1.25, (montecarlo_size, 1))
+    )
+    amzn.run()
+
+    # try initialization directly with matrices
+    amzn.dcf_assumptions = DCFAssumptions(
+        revenue_growth=amzn.dcf_assumptions.revenue_growth,
+        operating_margin=amzn.dcf_assumptions.operating_margin,
+        sales_to_capital_ratio=amzn.dcf_assumptions.sales_to_capital_ratio,
+        tax_rate=amzn.dcf_assumptions.tax_rate,
+        cost_of_capital=amzn.dcf_assumptions.cost_of_capital
+        * np.random.uniform(0.75, 1.25, (montecarlo_size, 1)),
+    )
+    data = amzn.compute_future_financials()
+    with tempfile.NamedTemporaryFile(suffix=".png") as export_file:
+        plot_financials_from_assumptions(data, export_file.name)
+    plot_financials_from_assumptions(data)
