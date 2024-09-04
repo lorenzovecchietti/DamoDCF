@@ -7,7 +7,7 @@ import pytest
 from damo_dcf import dcf_calculator, option_calculator
 from damo_dcf.dcf_calculator import DCFAssumptions
 from damo_dcf.option_calculator import OptionData
-from damo_dcf.plotting import plot_financials_from_assumptions
+from damo_dcf.plotting import plot_equity_value, plot_financials_from_assumptions
 
 
 @pytest.fixture(autouse=True)
@@ -96,3 +96,8 @@ def test_06_montecarlo_dcf():
     with tempfile.NamedTemporaryFile(suffix=".png") as export_file:
         plot_financials_from_assumptions(data, export_file.name)
     plot_financials_from_assumptions(data)
+    ev = amzn.run() / amzn.stock_data.number_of_shares_outstanding
+    n_bins = 20
+    with tempfile.NamedTemporaryFile(suffix=".png") as export_file:
+        plot_equity_value(ev, n_bins, export_file.name)
+    plot_equity_value(ev, n_bins)

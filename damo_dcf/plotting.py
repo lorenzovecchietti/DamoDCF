@@ -18,6 +18,19 @@ def plot_financials_from_assumptions(
     axs[-1, -1].remove()
     fig.suptitle("Financials")
     if export_file is not None:
-        plt.savefig(export_file)
+        fig.savefig(export_file)
     else:
-        plt.show()
+        fig.show()
+
+
+def plot_equity_value(
+    result: np.ndarray, n_bins: int, export_file: Optional[Union[str, Path]] = None
+):
+    fig, ax = plt.subplots()
+    ax.hist(result, bins=n_bins, density=True)
+    ax.set_xlabel("Currency")
+    ax.set_ylabel("Frequency")
+    if export_file is not None:
+        fig.savefig(export_file)
+    else:
+        fig.show()
