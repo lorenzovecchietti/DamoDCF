@@ -1,0 +1,30 @@
+ticker_symbol = "AMZN"
+multiplier = 1e6
+current_stock_price = 169
+
+[firm_data]
+revenue = 574785
+operating_income = 36852
+interest_expense = 3182
+book_value_of_equity = 201875
+book_value_of_debt =  161574
+cash_and_marketable_securities =  86780
+cross_holdings_and_other_non_operating_assets = 2954
+minority_interests = 0
+number_of_shares_outstanding = 10492
+carryforward_nol = 0
+effective_tax_rate = 0.19
+annualized_dividend = 0
+
+[future_assumptions]
+revenue_growth = [0.1,0.1,0.1,0.1,0.1,0.0882,0.0763,0.0645,0.0526,0.0408,0.0408]
+operating_margin = [0.1133,0.1240,0.1293,0.1347,0.1400,0.1400,0.1400,0.1400,0.1400,0.1400,0.1400]
+sales_to_capital_ratio = [1.50,1.50,1.50,1.50,1.50,1.50,1.50,1.50,1.50,1.50]
+tax_rate = [0.19,0.19,0.19,0.19,0.19,0.20,0.21,0.23,0.24,0.25,0.25]
+cost_of_capital=[0.08600,0.08600,0.08600,0.08600,0.08600,0.08562,0.08524,0.08486,0.08448,0.08410,0.08410]
+
+
+[market_data]
+riskfree_rate = 0.0408
+marginal_tax_rate = 0.25
+
