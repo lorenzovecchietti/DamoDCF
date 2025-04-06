@@ -1,0 +1,12 @@
+\usepackage{framed}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\usetikzlibrary{arrows}
+\usetikzlibrary{calc}
+
+\let\oldquote=\quote
+\let\endoldquote=\endquote
+\colorlet{shadecolor}{black!5}
+\renewenvironment{quote}{\begin{shaded*}\begin{oldquote}}{\end{oldquote}\end{shaded*}}
