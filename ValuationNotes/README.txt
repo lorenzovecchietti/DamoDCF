@@ -1,0 +1,1 @@
+pandoc *.md -o Valuation.pdf --toc --table-caption-position=below -V geometry:margin=0.75in -H header.tex
